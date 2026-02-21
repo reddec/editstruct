@@ -4,7 +4,7 @@ A Go code generation tool for modifying struct field types in-place.
 
 ## Use Case
 
-After running a code generator (like `stringer`, `moq`, or protobuf), you often need to adjust the generated types. `editstruct` lets you declaratively specify type changes in a config file and applies them during `go generate`.
+After running a code generator (like `stringer`, `moq`, `sqlc`, or protobuf), you often need to adjust the generated types. `editstruct` lets you declaratively specify type changes in a config file and applies them during `go generate`.
 
 ## Installation
 
@@ -77,3 +77,5 @@ Multi-document YAML where each document specifies one struct:
 - Scans only `*.go` files in current directory (non-recursive, excludes `*_test.go`)
 - Silently ignores missing fields/structs
 - Exits with error on parse failures
+
+> Note: mostly vibe-coded (GLM-5, opencode) but it works
