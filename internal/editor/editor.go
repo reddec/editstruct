@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -14,6 +15,13 @@ type Editor struct {
 	file    *ast.File
 	src     []byte
 	imports *importManager
+	edits   []typeEdit
+}
+
+type typeEdit struct {
+	start   int
+	end     int
+	newType string
 }
 
 type FieldEdit struct {
@@ -38,6 +46,7 @@ func ParseFile(path string) (*Editor, error) {
 		file:    file,
 		src:     src,
 		imports: newImportManager(file, fset, src),
+		edits:   nil,
 	}, nil
 }
 
@@ -79,7 +88,7 @@ func (e *Editor) EditStruct(structName string, fieldEdits map[string]string) (bo
 				continue
 			}
 
-			changed := e.editFields(st, fieldEdits)
+			changed := e.collectFieldEdits(st, fieldEdits)
 			if changed {
 				modified = true
 			}
@@ -89,7 +98,7 @@ func (e *Editor) EditStruct(structName string, fieldEdits map[string]string) (bo
 	return modified, nil
 }
 
-func (e *Editor) editFields(st *ast.StructType, fieldEdits map[string]string) bool {
+func (e *Editor) collectFieldEdits(st *ast.StructType, fieldEdits map[string]string) bool {
 	var modified bool
 
 	for _, field := range st.Fields.List {
@@ -108,12 +117,30 @@ func (e *Editor) editFields(st *ast.StructType, fieldEdits map[string]string) bo
 				continue
 			}
 
-			e.replaceType(field.Type, newType)
+			start := e.fset.Position(field.Type.Pos()).Offset
+			end := e.fset.Position(field.Type.End()).Offset
+			e.edits = append(e.edits, typeEdit{start: start, end: end, newType: newType})
 			modified = true
 		}
 	}
 
 	return modified
+}
+
+func (e *Editor) Apply() {
+	if len(e.edits) == 0 {
+		return
+	}
+
+	sort.Slice(e.edits, func(i, j int) bool {
+		return e.edits[i].start > e.edits[j].start
+	})
+
+	for _, edit := range e.edits {
+		e.src = append(e.src[:edit.start], append([]byte(edit.newType), e.src[edit.end:]...)...)
+	}
+
+	e.edits = nil
 }
 
 func (e *Editor) typeString(expr ast.Expr) string {
@@ -131,13 +158,6 @@ func (e *Editor) typeString(expr ast.Expr) string {
 	default:
 		return ""
 	}
-}
-
-func (e *Editor) replaceType(expr ast.Expr, newType string) {
-	start := e.fset.Position(expr.Pos()).Offset
-	end := e.fset.Position(expr.End()).Offset
-
-	e.src = append(e.src[:start], append([]byte(newType), e.src[end:]...)...)
 }
 
 func (e *Editor) AddImports(required map[string]string) error {

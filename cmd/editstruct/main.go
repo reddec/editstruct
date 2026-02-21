@@ -91,6 +91,8 @@ func processFile(path string, configs []config.TypeConfig) error {
 	}
 
 	if anyModified {
+		ed.Apply()
+
 		requiredImports := make(map[string]string)
 		for _, tc := range configs {
 			for alias, pkg := range tc.Imports() {
